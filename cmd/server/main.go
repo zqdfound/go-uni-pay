@@ -31,7 +31,7 @@ import (
 
 func main() {
 	// 加载配置
-	configPath := "configs/config.yaml"
+	configPath := "configs/config-dev.yaml"
 	if len(os.Args) > 1 {
 		configPath = os.Args[1]
 	}

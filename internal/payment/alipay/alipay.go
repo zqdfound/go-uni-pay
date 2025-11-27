@@ -192,11 +192,6 @@ func (p *Provider) getClient(config map[string]interface{}) (*alipay.Client, err
 		return nil, apperrors.New(apperrors.ErrConfigNotFound, "private_key not found in config")
 	}
 
-	publicKey, ok := config["public_key"].(string)
-	if !ok {
-		publicKey = "" // 可选
-	}
-
 	isProduction, _ := config["is_production"].(bool)
 
 	// 创建客户端
@@ -205,10 +200,42 @@ func (p *Provider) getClient(config map[string]interface{}) (*alipay.Client, err
 		return nil, apperrors.Wrap(apperrors.ErrPaymentCreate, "failed to create alipay client", err)
 	}
 
-	// 加载支付宝公钥
-	if publicKey != "" {
-		if err := client.LoadAliPayPublicKey(publicKey); err != nil {
-			return nil, apperrors.Wrap(apperrors.ErrPaymentCreate, "failed to load alipay public key", err)
+	// 检查是否使用证书模式
+	appPublicCert, hasAppCert := config["app_public_cert"].(string)
+	alipayPublicCert, hasAlipayCert := config["alipay_public_cert"].(string)
+	alipayRootCert, hasRootCert := config["alipay_root_cert"].(string)
+
+	// 如果配置了证书，则使用证书模式
+	if hasAppCert && hasAlipayCert && hasRootCert {
+		// 加载应用公钥证书
+		if err := client.LoadAppPublicCert(appPublicCert); err != nil {
+			return nil, apperrors.Wrap(apperrors.ErrPaymentCreate, "failed to load app public cert", err)
+		}
+
+		// 加载支付宝公钥证书
+		if err := client.LoadAliPayPublicCert(alipayPublicCert); err != nil {
+			return nil, apperrors.Wrap(apperrors.ErrPaymentCreate, "failed to load alipay public cert", err)
+		}
+
+		// 加载支付宝根证书
+		if err := client.LoadAliPayRootCert(alipayRootCert); err != nil {
+			return nil, apperrors.Wrap(apperrors.ErrPaymentCreate, "failed to load alipay root cert", err)
+		}
+	} else if hasAppCert || hasAlipayCert || hasRootCert {
+		// 如果只配置了部分证书，返回错误
+		return nil, apperrors.New(apperrors.ErrConfigNotFound, "certificate mode requires app_public_cert, alipay_public_cert and alipay_root_cert")
+	} else {
+		// 使用公钥模式（兼容旧版本）
+		publicKey, ok := config["public_key"].(string)
+		if !ok {
+			publicKey = "" // 可选
+		}
+
+		// 加载支付宝公钥
+		if publicKey != "" {
+			if err := client.LoadAliPayPublicKey(publicKey); err != nil {
+				return nil, apperrors.Wrap(apperrors.ErrPaymentCreate, "failed to load alipay public key", err)
+			}
 		}
 	}
 

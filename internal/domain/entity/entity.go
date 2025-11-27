@@ -14,8 +14,8 @@ type User struct {
 	APIKey    string    `gorm:"type:varchar(64);uniqueIndex;not null" json:"api_key"`
 	APISecret string    `gorm:"type:varchar(128);not null" json:"-"`
 	Status    int8      `gorm:"type:tinyint;not null;default:1" json:"status"`
-	CreatedAt time.Time `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt time.Time `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 // TableName 表名
@@ -31,8 +31,8 @@ type PaymentConfig struct {
 	ConfigName string     `gorm:"type:varchar(50);not null" json:"config_name"`
 	ConfigData ConfigData `gorm:"type:json;not null" json:"config_data"`
 	Status     int8       `gorm:"type:tinyint;not null;default:1" json:"status"`
-	CreatedAt  time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt  time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	CreatedAt  time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt  time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 // TableName 表名
@@ -83,8 +83,8 @@ type PaymentOrder struct {
 	ClientIP    string     `gorm:"type:varchar(45)" json:"client_ip"`
 	ExtraData   ConfigData `gorm:"type:json" json:"extra_data"`
 	PaymentTime *time.Time `gorm:"index" json:"payment_time"`
-	CreatedAt   time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP;index" json:"created_at"`
-	UpdatedAt   time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	CreatedAt   time.Time  `gorm:"autoCreateTime;index" json:"created_at"`
+	UpdatedAt   time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 // TableName 表名
@@ -112,7 +112,7 @@ type PaymentLog struct {
 	ResponseData ConfigData `gorm:"type:json" json:"response_data"`
 	Status       string     `gorm:"type:varchar(20);not null" json:"status"`
 	ErrorMsg     string     `gorm:"type:text" json:"error_msg"`
-	CreatedAt    time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP;index" json:"created_at"`
+	CreatedAt    time.Time  `gorm:"autoCreateTime;index" json:"created_at"`
 }
 
 // TableName 表名
@@ -134,7 +134,7 @@ type APILog struct {
 	IP             string    `gorm:"type:varchar(45)" json:"ip"`
 	UserAgent      string    `gorm:"type:varchar(512)" json:"user_agent"`
 	Duration       int       `gorm:"comment:请求耗时(毫秒)" json:"duration"`
-	CreatedAt      time.Time `gorm:"not null;default:CURRENT_TIMESTAMP;index" json:"created_at"`
+	CreatedAt      time.Time `gorm:"autoCreateTime;index" json:"created_at"`
 }
 
 // TableName 表名
@@ -155,8 +155,8 @@ type NotifyQueue struct {
 	LastError     string     `gorm:"type:text" json:"last_error"`
 	NextRetryTime *time.Time `gorm:"index" json:"next_retry_time"`
 	SuccessTime   *time.Time `json:"success_time"`
-	CreatedAt     time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP;index" json:"created_at"`
-	UpdatedAt     time.Time  `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	CreatedAt     time.Time  `gorm:"autoCreateTime;index" json:"created_at"`
+	UpdatedAt     time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 // TableName 表名

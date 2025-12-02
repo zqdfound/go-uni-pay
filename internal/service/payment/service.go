@@ -13,11 +13,17 @@ import (
 	"go.uber.org/zap"
 )
 
+// NotifyService 通知服务接口
+type NotifyService interface {
+	AddNotify(ctx context.Context, orderID uint64, orderNo, notifyURL string, notifyData map[string]interface{}) error
+}
+
 // Service 支付服务
 type Service struct {
-	orderRepo  repository.PaymentOrderRepository
-	configRepo repository.PaymentConfigRepository
-	logRepo    repository.PaymentLogRepository
+	orderRepo     repository.PaymentOrderRepository
+	configRepo    repository.PaymentConfigRepository
+	logRepo       repository.PaymentLogRepository
+	notifyService NotifyService
 }
 
 // NewService 创建支付服务
@@ -25,11 +31,13 @@ func NewService(
 	orderRepo repository.PaymentOrderRepository,
 	configRepo repository.PaymentConfigRepository,
 	logRepo repository.PaymentLogRepository,
+	notifyService NotifyService,
 ) *Service {
 	return &Service{
-		orderRepo:  orderRepo,
-		configRepo: configRepo,
-		logRepo:    logRepo,
+		orderRepo:     orderRepo,
+		configRepo:    configRepo,
+		logRepo:       logRepo,
+		notifyService: notifyService,
 	}
 }
 
@@ -185,6 +193,7 @@ func (s *Service) QueryPayment(ctx context.Context, orderNo string) (*entity.Pay
 
 	// 更新订单状态
 	if queryResp.Status != order.Status {
+		oldStatus := order.Status
 		order.Status = queryResp.Status
 		if queryResp.Status == entity.OrderStatusSuccess {
 			now := time.Now()
@@ -193,7 +202,37 @@ func (s *Service) QueryPayment(ctx context.Context, orderNo string) (*entity.Pay
 		if queryResp.TradeNo != "" {
 			order.TradeNo = queryResp.TradeNo
 		}
-		s.orderRepo.Update(ctx, order)
+		if err := s.orderRepo.Update(ctx, order); err != nil {
+			logger.Error("failed to update order", zap.Error(err))
+			return order, err
+		}
+
+		// 如果订单状态变为成功，且有通知URL，添加通知任务
+		if order.Status == entity.OrderStatusSuccess && oldStatus != entity.OrderStatusSuccess && order.NotifyURL != "" {
+			notifyData := map[string]interface{}{
+				"order_no":     order.OrderNo,
+				"out_trade_no": order.OutTradeNo,
+				"trade_no":     order.TradeNo,
+				"amount":       order.Amount,
+				"currency":     order.Currency,
+				"status":       order.Status,
+				"payment_time": order.PaymentTime,
+				"subject":      order.Subject,
+			}
+
+			if err := s.notifyService.AddNotify(ctx, order.ID, order.OrderNo, order.NotifyURL, notifyData); err != nil {
+				logger.Error("failed to add notify task",
+					zap.Uint64("order_id", order.ID),
+					zap.String("order_no", order.OrderNo),
+					zap.Error(err))
+				// 不影响主流程，继续返回
+			} else {
+				logger.Info("notify task added",
+					zap.Uint64("order_id", order.ID),
+					zap.String("order_no", order.OrderNo),
+					zap.String("notify_url", order.NotifyURL))
+			}
+		}
 	}
 
 	return order, nil
@@ -226,6 +265,7 @@ func (s *Service) HandleNotify(ctx context.Context, provider string, req *paymen
 
 	// 更新订单状态
 	if notifyResp.Status != order.Status {
+		oldStatus := order.Status
 		order.Status = notifyResp.Status
 		if notifyResp.TradeNo != "" {
 			order.TradeNo = notifyResp.TradeNo
@@ -234,7 +274,37 @@ func (s *Service) HandleNotify(ctx context.Context, provider string, req *paymen
 			now := time.Now()
 			order.PaymentTime = &now
 		}
-		s.orderRepo.Update(ctx, order)
+		if err := s.orderRepo.Update(ctx, order); err != nil {
+			logger.Error("failed to update order", zap.Error(err))
+			return notifyResp.ReturnData, err
+		}
+
+		// 如果订单状态变为成功，且有通知URL，添加通知任务
+		if order.Status == entity.OrderStatusSuccess && oldStatus != entity.OrderStatusSuccess && order.NotifyURL != "" {
+			notifyData := map[string]interface{}{
+				"order_no":     order.OrderNo,
+				"out_trade_no": order.OutTradeNo,
+				"trade_no":     order.TradeNo,
+				"amount":       order.Amount,
+				"currency":     order.Currency,
+				"status":       order.Status,
+				"payment_time": order.PaymentTime,
+				"subject":      order.Subject,
+			}
+
+			if err := s.notifyService.AddNotify(ctx, order.ID, order.OrderNo, order.NotifyURL, notifyData); err != nil {
+				logger.Error("failed to add notify task",
+					zap.Uint64("order_id", order.ID),
+					zap.String("order_no", order.OrderNo),
+					zap.Error(err))
+				// 不影响主流程，继续返回
+			} else {
+				logger.Info("notify task added",
+					zap.Uint64("order_id", order.ID),
+					zap.String("order_no", order.OrderNo),
+					zap.String("notify_url", order.NotifyURL))
+			}
+		}
 	}
 
 	return notifyResp.ReturnData, nil

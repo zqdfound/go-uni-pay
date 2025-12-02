@@ -94,13 +94,17 @@ func main() {
 
 	// 创建服务
 	authService := auth.NewService(userRepo)
-	paymentService := payment.NewService(paymentOrderRepo, paymentConfigRepo, paymentLogRepo)
+
+	// 先创建通知服务
 	notifyService := notify.NewService(
 		notifyQueueRepo,
 		config.Cfg.Notify.WorkerCount,
 		time.Duration(config.Cfg.Notify.RetryInterval)*time.Second,
 		config.Cfg.Notify.MaxRetry,
 	)
+
+	// 创建支付服务，注入通知服务
+	paymentService := payment.NewService(paymentOrderRepo, paymentConfigRepo, paymentLogRepo, notifyService)
 
 	// 启动通知服务
 	notifyService.Start()

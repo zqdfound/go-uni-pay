@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"time"
 
@@ -99,7 +100,11 @@ func LoggerMiddleware(apiLogRepo repository.APILogRepository) gin.HandlerFunc {
 
 		// 异步保存日志
 		go func() {
-			if err := apiLogRepo.Create(c.Request.Context(), apiLog); err != nil {
+			// 使用独立的 context，避免请求结束后 context 被取消
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			if err := apiLogRepo.Create(ctx, apiLog); err != nil {
 				logger.Error("failed to create api log", zap.Error(err))
 			}
 		}()

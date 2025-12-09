@@ -35,7 +35,9 @@ func SetupRouter(
 		public := v1.Group("/public")
 		{
 			// 支付通知回调（由第三方支付平台调用）
-			public.POST("/notify/:provider", paymentHandler.HandleNotify)
+			// URL格式: /api/v1/public/notify/:provider/:config_id
+			// 例如: /api/v1/public/notify/paypal/123
+			public.POST("/notify/:provider/:config_id", paymentHandler.HandleNotify)
 		}
 
 		// 需要认证的接口

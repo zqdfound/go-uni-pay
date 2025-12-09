@@ -1,19 +1,30 @@
 package handler
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/gin-gonic/gin"
 	"github.com/zqdfound/go-uni-pay/internal/payment"
 	paymentService "github.com/zqdfound/go-uni-pay/internal/service/payment"
 	apperrors "github.com/zqdfound/go-uni-pay/pkg/errors"
 )
 
+// PaymentServiceInterface 支付服务接口，用于依赖注入和测试
+type PaymentServiceInterface interface {
+	CreatePayment(ctx context.Context, req *paymentService.CreatePaymentRequest) (*paymentService.CreatePaymentResponse, error)
+	QueryPayment(ctx context.Context, orderNo string) (interface{}, error)
+	HandleNotify(ctx context.Context, provider string, req *payment.NotifyRequest) ([]byte, error)
+	GetConfigByID(ctx context.Context, configID uint64) (map[string]interface{}, error)
+}
+
 // PaymentHandler 支付处理器
 type PaymentHandler struct {
-	paymentService *paymentService.Service
+	paymentService PaymentServiceInterface
 }
 
 // NewPaymentHandler 创建支付处理器
-func NewPaymentHandler(paymentService *paymentService.Service) *PaymentHandler {
+func NewPaymentHandler(paymentService PaymentServiceInterface) *PaymentHandler {
 	return &PaymentHandler{
 		paymentService: paymentService,
 	}
@@ -21,14 +32,14 @@ func NewPaymentHandler(paymentService *paymentService.Service) *PaymentHandler {
 
 // CreatePaymentRequest 创建支付请求
 type CreatePaymentRequest struct {
-	Provider   string                 `json:"provider" binding:"required"`
-	OutTradeNo string                 `json:"out_trade_no" binding:"required"`
-	Subject    string                 `json:"subject" binding:"required"`
-	Body       string                 `json:"body"`
-	Amount     float64                `json:"amount" binding:"required,gt=0"`
-	Currency   string                 `json:"currency"`
-	NotifyURL  string                 `json:"notify_url"`
-	ReturnURL  string                 `json:"return_url"`
+	Provider    string                 `json:"provider" binding:"required"`
+	OutTradeNo  string                 `json:"out_trade_no" binding:"required"`
+	Subject     string                 `json:"subject" binding:"required"`
+	Body        string                 `json:"body"`
+	Amount      float64                `json:"amount" binding:"required,gt=0"`
+	Currency    string                 `json:"currency"`
+	NotifyURL   string                 `json:"notify_url"`
+	ReturnURL   string                 `json:"return_url"`
 	ExtraParams map[string]interface{} `json:"extra_params"`
 }
 
@@ -127,8 +138,29 @@ func (h *PaymentHandler) QueryPayment(c *gin.Context) {
 // HandleNotify 处理支付通知
 func (h *PaymentHandler) HandleNotify(c *gin.Context) {
 	provider := c.Param("provider")
+	configIDStr := c.Param("config_id")
+
 	if provider == "" {
 		c.String(400, "provider is required")
+		return
+	}
+
+	if configIDStr == "" {
+		c.String(400, "config_id is required")
+		return
+	}
+
+	// 解析 config_id
+	var configID uint64
+	if _, err := fmt.Sscanf(configIDStr, "%d", &configID); err != nil {
+		c.String(400, "invalid config_id")
+		return
+	}
+
+	// 获取支付配置
+	config, err := h.paymentService.GetConfigByID(c.Request.Context(), configID)
+	if err != nil {
+		c.String(400, "config not found")
 		return
 	}
 
@@ -140,7 +172,7 @@ func (h *PaymentHandler) HandleNotify(c *gin.Context) {
 		RawData:    bodyBytes,
 		FormData:   c.Request.Form,
 		RequestURL: c.Request.URL.String(),
-		Config:     make(map[string]interface{}), // 需要从数据库获取配置
+		Config:     config, // 从数据库获取的配置
 	}
 
 	// 处理通知

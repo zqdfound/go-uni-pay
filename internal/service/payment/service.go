@@ -151,7 +151,7 @@ func (s *Service) CreatePayment(ctx context.Context, req *CreatePaymentRequest) 
 }
 
 // QueryPayment 查询支付
-func (s *Service) QueryPayment(ctx context.Context, orderNo string) (*entity.PaymentOrder, error) {
+func (s *Service) QueryPayment(ctx context.Context, orderNo string) (interface{}, error) {
 	// 查询订单
 	order, err := s.orderRepo.GetByOrderNo(ctx, orderNo)
 	if err != nil {
@@ -308,6 +308,16 @@ func (s *Service) HandleNotify(ctx context.Context, provider string, req *paymen
 	}
 
 	return notifyResp.ReturnData, nil
+}
+
+// GetConfigByID 根据配置ID获取支付配置
+func (s *Service) GetConfigByID(ctx context.Context, configID uint64) (map[string]interface{}, error) {
+	config, err := s.configRepo.GetByID(ctx, configID)
+	if err != nil {
+		return nil, err
+	}
+
+	return config.ConfigData, nil
 }
 
 // generateOrderNo 生成订单号

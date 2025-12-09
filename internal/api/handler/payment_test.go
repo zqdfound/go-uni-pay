@@ -19,13 +19,6 @@ import (
 	paymentService "github.com/zqdfound/go-uni-pay/internal/service/payment"
 )
 
-// PaymentServiceInterface 支付服务接口
-type PaymentServiceInterface interface {
-	CreatePayment(ctx context.Context, req *paymentService.CreatePaymentRequest) (*paymentService.CreatePaymentResponse, error)
-	QueryPayment(ctx context.Context, orderNo string) (interface{}, error)
-	HandleNotify(ctx context.Context, provider string, req *payment.NotifyRequest) ([]byte, error)
-}
-
 // MockPaymentService 模拟支付服务
 type MockPaymentService struct {
 	mock.Mock
@@ -52,34 +45,12 @@ func (m *MockPaymentService) HandleNotify(ctx context.Context, provider string, 
 	return args.Get(0).([]byte), args.Error(1)
 }
 
-// TestPaymentHandler 支付处理器测试封装
-type TestPaymentHandler struct {
-	service PaymentServiceInterface
-}
-
-func (h *TestPaymentHandler) HandleNotify(c *gin.Context) {
-	provider := c.Param("provider")
-	if provider == "" {
-		c.String(400, "provider is required")
-		return
+func (m *MockPaymentService) GetConfigByID(ctx context.Context, configID uint64) (map[string]interface{}, error) {
+	args := m.Called(ctx, configID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-
-	bodyBytes, _ := c.GetRawData()
-
-	notifyReq := &payment.NotifyRequest{
-		RawData:    bodyBytes,
-		FormData:   c.Request.Form,
-		RequestURL: c.Request.URL.String(),
-		Config:     make(map[string]interface{}),
-	}
-
-	returnData, err := h.service.HandleNotify(c.Request.Context(), provider, notifyReq)
-	if err != nil {
-		c.String(500, "error")
-		return
-	}
-
-	c.Data(200, "text/plain", returnData)
+	return args.Get(0).(map[string]interface{}), args.Error(1)
 }
 
 // TestHandleNotify_Alipay 测试支付宝支付通知
@@ -92,19 +63,24 @@ func TestHandleNotify_Alipay(t *testing.T) {
 	formData := parseFormData(string(testData))
 
 	mockService := new(MockPaymentService)
+	// Mock 配置查询
+	mockService.On("GetConfigByID", mock.Anything, uint64(1)).Return(map[string]interface{}{
+		"app_id":      "test_app_id",
+		"private_key": "test_private_key",
+		"public_key":  "test_public_key",
+	}, nil)
 	mockService.On("HandleNotify", mock.Anything, "alipay", mock.Anything).Return([]byte("success"), nil)
 
-	handler := &TestPaymentHandler{
-		service: mockService,
-	}
+	handler := NewPaymentHandler(mockService)
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest("POST", "/notify/alipay", bytes.NewBufferString(string(testData)))
+	c.Request = httptest.NewRequest("POST", "/notify/alipay/1", bytes.NewBufferString(string(testData)))
 	c.Request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	c.Request.Form = formData
 	c.Params = gin.Params{
 		{Key: "provider", Value: "alipay"},
+		{Key: "config_id", Value: "1"},
 	}
 
 	handler.HandleNotify(c)
@@ -122,18 +98,22 @@ func TestHandleNotify_Wechat(t *testing.T) {
 	assert.NoError(t, err)
 
 	mockService := new(MockPaymentService)
+	// Mock 配置查询
+	mockService.On("GetConfigByID", mock.Anything, uint64(2)).Return(map[string]interface{}{
+		"mch_id":     "test_mch_id",
+		"api_v3_key": "test_api_v3_key",
+	}, nil)
 	mockService.On("HandleNotify", mock.Anything, "wechat", mock.Anything).Return([]byte(`{"code": "SUCCESS", "message": "成功"}`), nil)
 
-	handler := &TestPaymentHandler{
-		service: mockService,
-	}
+	handler := NewPaymentHandler(mockService)
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest("POST", "/notify/wechat", bytes.NewBuffer(testData))
+	c.Request = httptest.NewRequest("POST", "/notify/wechat/2", bytes.NewBuffer(testData))
 	c.Request.Header.Set("Content-Type", "application/xml")
 	c.Params = gin.Params{
 		{Key: "provider", Value: "wechat"},
+		{Key: "config_id", Value: "2"},
 	}
 
 	handler.HandleNotify(c)
@@ -151,19 +131,23 @@ func TestHandleNotify_Stripe(t *testing.T) {
 	assert.NoError(t, err)
 
 	mockService := new(MockPaymentService)
+	// Mock 配置查询
+	mockService.On("GetConfigByID", mock.Anything, uint64(3)).Return(map[string]interface{}{
+		"api_key":        "test_api_key",
+		"webhook_secret": "test_webhook_secret",
+	}, nil)
 	mockService.On("HandleNotify", mock.Anything, "stripe", mock.Anything).Return([]byte(`{"received": true}`), nil)
 
-	handler := &TestPaymentHandler{
-		service: mockService,
-	}
+	handler := NewPaymentHandler(mockService)
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest("POST", "/notify/stripe", bytes.NewBuffer(testData))
+	c.Request = httptest.NewRequest("POST", "/notify/stripe/3", bytes.NewBuffer(testData))
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Request.Header.Set("Stripe-Signature", "t=1234567890,v1=test_signature")
 	c.Params = gin.Params{
 		{Key: "provider", Value: "stripe"},
+		{Key: "config_id", Value: "3"},
 	}
 
 	handler.HandleNotify(c)
@@ -181,15 +165,19 @@ func TestHandleNotify_PayPal(t *testing.T) {
 	assert.NoError(t, err)
 
 	mockService := new(MockPaymentService)
+	// Mock 配置查询
+	mockService.On("GetConfigByID", mock.Anything, uint64(4)).Return(map[string]interface{}{
+		"client_id":     "test_client_id",
+		"client_secret": "test_client_secret",
+		"webhook_id":    "test_webhook_id",
+	}, nil)
 	mockService.On("HandleNotify", mock.Anything, "paypal", mock.Anything).Return([]byte(`{"status": "success"}`), nil)
 
-	handler := &TestPaymentHandler{
-		service: mockService,
-	}
+	handler := NewPaymentHandler(mockService)
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest("POST", "/notify/paypal", bytes.NewBuffer(testData))
+	c.Request = httptest.NewRequest("POST", "/notify/paypal/4", bytes.NewBuffer(testData))
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Request.Header.Set("Paypal-Transmission-Id", "test-transmission-id")
 	c.Request.Header.Set("Paypal-Transmission-Time", "2024-01-01T00:00:00Z")
@@ -198,6 +186,7 @@ func TestHandleNotify_PayPal(t *testing.T) {
 	c.Request.Header.Set("Paypal-Auth-Algo", "SHA256withRSA")
 	c.Params = gin.Params{
 		{Key: "provider", Value: "paypal"},
+		{Key: "config_id", Value: "4"},
 	}
 
 	handler.HandleNotify(c)
@@ -212,21 +201,65 @@ func TestHandleNotify_InvalidProvider(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockService := new(MockPaymentService)
-	handler := &TestPaymentHandler{
-		service: mockService,
-	}
+	handler := NewPaymentHandler(mockService)
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest("POST", "/notify/", nil)
+	c.Request = httptest.NewRequest("POST", "/notify//1", nil)
 	c.Params = gin.Params{
 		{Key: "provider", Value: ""},
+		{Key: "config_id", Value: "1"},
 	}
 
 	handler.HandleNotify(c)
 
 	assert.Equal(t, 400, w.Code)
 	assert.Contains(t, w.Body.String(), "provider is required")
+}
+
+// TestHandleNotify_InvalidConfigID 测试无效的配置ID
+func TestHandleNotify_InvalidConfigID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockService := new(MockPaymentService)
+	handler := NewPaymentHandler(mockService)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("POST", "/notify/stripe/abc", nil)
+	c.Params = gin.Params{
+		{Key: "provider", Value: "stripe"},
+		{Key: "config_id", Value: "abc"},
+	}
+
+	handler.HandleNotify(c)
+
+	assert.Equal(t, 400, w.Code)
+	assert.Contains(t, w.Body.String(), "invalid config_id")
+}
+
+// TestHandleNotify_ConfigNotFound 测试配置不存在
+func TestHandleNotify_ConfigNotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockService := new(MockPaymentService)
+	mockService.On("GetConfigByID", mock.Anything, uint64(999)).Return(nil, assert.AnError)
+
+	handler := NewPaymentHandler(mockService)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("POST", "/notify/stripe/999", nil)
+	c.Params = gin.Params{
+		{Key: "provider", Value: "stripe"},
+		{Key: "config_id", Value: "999"},
+	}
+
+	handler.HandleNotify(c)
+
+	assert.Equal(t, 400, w.Code)
+	assert.Contains(t, w.Body.String(), "config not found")
+	mockService.AssertExpectations(t)
 }
 
 // TestHandleNotify_ServiceError 测试服务错误
@@ -236,17 +269,19 @@ func TestHandleNotify_ServiceError(t *testing.T) {
 	testData := []byte(`{"test": "data"}`)
 
 	mockService := new(MockPaymentService)
+	mockService.On("GetConfigByID", mock.Anything, uint64(3)).Return(map[string]interface{}{
+		"api_key": "test_api_key",
+	}, nil)
 	mockService.On("HandleNotify", mock.Anything, "stripe", mock.Anything).Return(nil, assert.AnError)
 
-	handler := &TestPaymentHandler{
-		service: mockService,
-	}
+	handler := NewPaymentHandler(mockService)
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest("POST", "/notify/stripe", bytes.NewBuffer(testData))
+	c.Request = httptest.NewRequest("POST", "/notify/stripe/3", bytes.NewBuffer(testData))
 	c.Params = gin.Params{
 		{Key: "provider", Value: "stripe"},
+		{Key: "config_id", Value: "3"},
 	}
 
 	handler.HandleNotify(c)
@@ -277,34 +312,37 @@ func BenchmarkHandleNotify_Alipay(b *testing.B) {
 
 	testData, _ := os.ReadFile("testdata/alipay_notify.txt")
 	mockService := new(MockPaymentService)
+	mockService.On("GetConfigByID", mock.Anything, uint64(1)).Return(map[string]interface{}{
+		"app_id": "test_app_id",
+	}, nil)
 	mockService.On("HandleNotify", mock.Anything, "alipay", mock.Anything).Return([]byte("success"), nil)
 
-	handler := &TestPaymentHandler{
-		service: mockService,
-	}
+	handler := NewPaymentHandler(mockService)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request = httptest.NewRequest("POST", "/notify/alipay", bytes.NewBuffer(testData))
+		c.Request = httptest.NewRequest("POST", "/notify/alipay/1", bytes.NewBuffer(testData))
 		c.Params = gin.Params{
 			{Key: "provider", Value: "alipay"},
+			{Key: "config_id", Value: "1"},
 		}
 		handler.HandleNotify(c)
 	}
 }
 
-// ExampleTestPaymentHandler_HandleNotify 示例
-func ExampleTestPaymentHandler_HandleNotify() {
+// ExamplePaymentHandler_HandleNotify 示例
+func ExamplePaymentHandler_HandleNotify() {
 	gin.SetMode(gin.TestMode)
 
 	mockService := new(MockPaymentService)
+	mockService.On("GetConfigByID", mock.Anything, uint64(3)).Return(map[string]interface{}{
+		"api_key": "test_api_key",
+	}, nil)
 	mockService.On("HandleNotify", mock.Anything, "stripe", mock.Anything).Return([]byte(`{"received": true}`), nil)
 
-	handler := &TestPaymentHandler{
-		service: mockService,
-	}
+	handler := NewPaymentHandler(mockService)
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -320,10 +358,11 @@ func ExampleTestPaymentHandler_HandleNotify() {
 	}
 	payload, _ := json.Marshal(payloadJSON)
 
-	c.Request = httptest.NewRequest("POST", "/notify/stripe", bytes.NewBuffer(payload))
+	c.Request = httptest.NewRequest("POST", "/notify/stripe/3", bytes.NewBuffer(payload))
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Params = gin.Params{
 		{Key: "provider", Value: "stripe"},
+		{Key: "config_id", Value: "3"},
 	}
 
 	handler.HandleNotify(c)

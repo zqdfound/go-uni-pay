@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/zqdfound/go-uni-pay/internal/domain/entity"
@@ -16,11 +17,11 @@ import (
 
 // Service 通知服务
 type Service struct {
-	queueRepo   repository.NotifyQueueRepository
-	workerCount int
+	queueRepo     repository.NotifyQueueRepository
+	workerCount   int
 	retryInterval time.Duration
-	maxRetry    int
-	stopCh      chan struct{}
+	maxRetry      int
+	stopCh        chan struct{}
 }
 
 // NewService 创建通知服务
@@ -91,9 +92,16 @@ func (s *Service) processPendingTasks(ctx context.Context) {
 		return
 	}
 
+	// 并发处理所有任务，避免慢任务阻塞
+	var wg sync.WaitGroup
 	for _, task := range tasks {
-		s.processTask(ctx, task)
+		wg.Add(1)
+		go func(t *entity.NotifyQueue) {
+			defer wg.Done()
+			s.processTask(ctx, t)
+		}(task)
 	}
+	wg.Wait()
 }
 
 // processTask 处理单个任务

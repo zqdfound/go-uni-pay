@@ -7,6 +7,7 @@ import (
 	"github.com/zqdfound/go-uni-pay/internal/domain/entity"
 	apperrors "github.com/zqdfound/go-uni-pay/pkg/errors"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // MySQLUserRepository MySQL用户仓储实现
@@ -296,7 +297,10 @@ func (r *MySQLNotifyQueueRepository) GetPendingTasks(ctx context.Context, limit 
 	var queues []*entity.NotifyQueue
 	now := time.Now()
 
+	// 使用 FOR UPDATE SKIP LOCKED 避免多个 worker 获取相同任务
+	// SKIP LOCKED 会跳过已被其他事务锁定的行，每个 worker 获取不同的任务
 	if err := r.db.WithContext(ctx).
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("status = ? AND retry_count < max_retry AND (next_retry_time IS NULL OR next_retry_time <= ?)",
 			entity.NotifyStatusPending, now).
 		Order("created_at ASC").
@@ -309,7 +313,13 @@ func (r *MySQLNotifyQueueRepository) GetPendingTasks(ctx context.Context, limit 
 }
 
 func (r *MySQLNotifyQueueRepository) Update(ctx context.Context, queue *entity.NotifyQueue) error {
-	if err := r.db.WithContext(ctx).Save(queue).Error; err != nil {
+	if err := r.db.WithContext(ctx).Model(queue).Updates(map[string]interface{}{
+		"status":          queue.Status,
+		"retry_count":     queue.RetryCount,
+		"last_error":      queue.LastError,
+		"next_retry_time": queue.NextRetryTime,
+		"success_time":    queue.SuccessTime,
+	}).Error; err != nil {
 		return apperrors.Wrap(apperrors.ErrDatabaseUpdate, "failed to update notify queue", err)
 	}
 	return nil

@@ -1,6 +1,8 @@
 package router
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/zqdfound/go-uni-pay/internal/api/handler"
 	"github.com/zqdfound/go-uni-pay/internal/api/middleware"
@@ -43,6 +45,8 @@ func SetupRouter(
 		// 需要认证的接口
 		auth := v1.Group("")
 		auth.Use(middleware.AuthMiddleware(authService))
+		// 添加限流：每分钟最多100次请求
+		auth.Use(middleware.RateLimitMiddleware(100, time.Minute))
 		{
 			// 支付相关接口
 			payment := auth.Group("/payment")

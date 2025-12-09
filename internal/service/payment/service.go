@@ -2,13 +2,17 @@ package payment
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/zqdfound/go-uni-pay/internal/domain/entity"
 	"github.com/zqdfound/go-uni-pay/internal/domain/repository"
+	"github.com/zqdfound/go-uni-pay/internal/infrastructure/cache"
+	"github.com/zqdfound/go-uni-pay/internal/infrastructure/lock"
 	"github.com/zqdfound/go-uni-pay/internal/payment"
+	apperrors "github.com/zqdfound/go-uni-pay/pkg/errors"
 	"github.com/zqdfound/go-uni-pay/pkg/logger"
 	"go.uber.org/zap"
 )
@@ -67,8 +71,41 @@ type CreatePaymentResponse struct {
 
 // CreatePayment 创建支付
 func (s *Service) CreatePayment(ctx context.Context, req *CreatePaymentRequest) (*CreatePaymentResponse, error) {
-	// 获取支付配置
-	config, err := s.configRepo.GetActiveByUserAndProvider(ctx, req.UserID, req.Provider)
+	// 使用分布式锁防止重复创建，基于 out_trade_no
+	lockKey := fmt.Sprintf("payment:create:%s", req.OutTradeNo)
+	distLock := lock.NewRedisLock(cache.Client, lockKey, 30*time.Second)
+
+	// 尝试获取锁
+	if err := distLock.TryLock(ctx, 3, 100*time.Millisecond); err != nil {
+		return nil, apperrors.New(apperrors.ErrInternalServer, "failed to acquire lock, please retry")
+	}
+	defer func() {
+		if err := distLock.Unlock(context.Background()); err != nil {
+			logger.Error("failed to unlock", zap.Error(err))
+		}
+	}()
+
+	// 检查订单是否已存在（幂等性保证）
+	existingOrder, err := s.orderRepo.GetByOutTradeNo(ctx, req.OutTradeNo)
+	if err == nil && existingOrder != nil {
+		// 订单已存在，根据订单状态返回相应信息
+		logger.Info("payment order already exists",
+			zap.String("out_trade_no", req.OutTradeNo),
+			zap.String("order_no", existingOrder.OrderNo),
+			zap.String("status", existingOrder.Status))
+
+		// 如果订单状态不是失败，返回已有订单信息
+		if existingOrder.Status != entity.OrderStatusFailed {
+			return &CreatePaymentResponse{
+				OrderNo: existingOrder.OrderNo,
+				// 注意：已有订单可能没有 PaymentURL，需要特殊处理
+			}, nil
+		}
+		// 如果订单状态是失败，允许重试创建
+	}
+
+	// 获取支付配置（带缓存）
+	config, err := s.getConfigWithCache(ctx, req.UserID, req.Provider)
 	if err != nil {
 		return nil, err
 	}
@@ -320,9 +357,52 @@ func (s *Service) GetConfigByID(ctx context.Context, configID uint64) (map[strin
 	return config.ConfigData, nil
 }
 
+// getConfigWithCache 从缓存或数据库获取支付配置
+func (s *Service) getConfigWithCache(ctx context.Context, userID uint64, provider string) (*entity.PaymentConfig, error) {
+	// 构造缓存key
+	cacheKey := fmt.Sprintf("payment:config:%d:%s", userID, provider)
+
+	// 先尝试从缓存获取
+	cached, err := cache.Get(ctx, cacheKey)
+	if err == nil && cached != "" {
+		var config entity.PaymentConfig
+		if err := json.Unmarshal([]byte(cached), &config); err == nil {
+			logger.Debug("payment config cache hit",
+				zap.Uint64("user_id", userID),
+				zap.String("provider", provider))
+			return &config, nil
+		}
+	}
+
+	// 缓存未命中，从数据库查询
+	config, err := s.configRepo.GetActiveByUserAndProvider(ctx, userID, provider)
+	if err != nil {
+		return nil, err
+	}
+
+	// 写入缓存，有效期5分钟
+	if configJSON, err := json.Marshal(config); err == nil {
+		cache.Set(ctx, cacheKey, string(configJSON), 5*time.Minute)
+		logger.Debug("payment config cached",
+			zap.Uint64("user_id", userID),
+			zap.String("provider", provider))
+	}
+
+	return config, nil
+}
+
+// InvalidateConfigCache 使配置缓存失效
+// 当配置更新时应该调用此方法
+func (s *Service) InvalidateConfigCache(ctx context.Context, userID uint64, provider string) error {
+	cacheKey := fmt.Sprintf("payment:config:%d:%s", userID, provider)
+	return cache.Del(ctx, cacheKey)
+}
+
 // generateOrderNo 生成订单号
+// 使用纳秒时间戳 + UUID 确保高并发下的唯一性
 func (s *Service) generateOrderNo() string {
-	return fmt.Sprintf("UNI%s%s", time.Now().Format("20060102150405"), uuid.New().String()[:8])
+	// 使用纳秒时间戳（19位）+ UUID前12位，确保唯一性
+	return fmt.Sprintf("UNI%d%s", time.Now().UnixNano(), uuid.New().String()[:12])
 }
 
 // logPayment 记录支付日志

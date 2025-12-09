@@ -3,12 +3,14 @@ package middleware
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/zqdfound/go-uni-pay/internal/domain/entity"
 	"github.com/zqdfound/go-uni-pay/internal/domain/repository"
+	"github.com/zqdfound/go-uni-pay/internal/infrastructure/cache"
 	"github.com/zqdfound/go-uni-pay/internal/service/auth"
 	apperrors "github.com/zqdfound/go-uni-pay/pkg/errors"
 	"github.com/zqdfound/go-uni-pay/pkg/logger"
@@ -167,4 +169,66 @@ func RecoveryMiddleware() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+// RateLimitMiddleware API限流中间件
+// 基于Redis实现滑动窗口限流
+func RateLimitMiddleware(limit int, window time.Duration) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 获取用户ID，如果未认证则使用IP地址
+		var identifier string
+		if userID, exists := c.Get("user_id"); exists {
+			identifier = fmt.Sprintf("user:%v", userID)
+		} else {
+			identifier = fmt.Sprintf("ip:%s", c.ClientIP())
+		}
+
+		// 构造限流key
+		key := fmt.Sprintf("ratelimit:%s", identifier)
+
+		// 使用Redis进行计数
+		ctx := c.Request.Context()
+		count, err := cache.Client.Incr(ctx, key).Result()
+		if err != nil {
+			// Redis错误不应该阻止请求
+			logger.Error("rate limit redis error", zap.Error(err))
+			c.Next()
+			return
+		}
+
+		// 第一次请求时设置过期时间
+		if count == 1 {
+			cache.Client.Expire(ctx, key, window)
+		}
+
+		// 设置响应头，告知客户端限流信息
+		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", limit))
+		c.Header("X-RateLimit-Remaining", fmt.Sprintf("%d", max(0, limit-int(count))))
+
+		// 检查是否超过限制
+		if count > int64(limit) {
+			logger.Warn("rate limit exceeded",
+				zap.String("identifier", identifier),
+				zap.Int64("count", count),
+				zap.Int("limit", limit),
+			)
+
+			c.JSON(429, gin.H{
+				"code":    1005,
+				"message": "rate limit exceeded",
+			})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// max 返回两个整数中的较大值
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

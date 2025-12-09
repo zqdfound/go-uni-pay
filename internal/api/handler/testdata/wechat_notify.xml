@@ -1,0 +1,19 @@
+<xml>
+  <appid><![CDATA[wx1234567890abcdef]]></appid>
+  <mch_id><![CDATA[1234567890]]></mch_id>
+  <nonce_str><![CDATA[5K8264ILTKCH16CQ2502SI8ZNMTM67VS]]></nonce_str>
+  <openid><![CDATA[oUpF8uMuAJO_M2pxb1Q9zNjWeS6o]]></openid>
+  <out_trade_no><![CDATA[TEST20240101000001]]></out_trade_no>
+  <result_code><![CDATA[SUCCESS]]></result_code>
+  <return_code><![CDATA[SUCCESS]]></return_code>
+  <sign><![CDATA[B552ED6B279343CB493C5DD0D78AB241]]></sign>
+  <time_end><![CDATA[20240101100530]]></time_end>
+  <total_fee>10000</total_fee>
+  <trade_type><![CDATA[NATIVE]]></trade_type>
+  <transaction_id><![CDATA[4200001234567890123456789012]]></transaction_id>
+  <bank_type><![CDATA[CMB_DEBIT]]></bank_type>
+  <cash_fee>10000</cash_fee>
+  <fee_type><![CDATA[CNY]]></fee_type>
+  <is_subscribe><![CDATA[N]]></is_subscribe>
+  <attach><![CDATA[测试订单]]></attach>
+</xml>

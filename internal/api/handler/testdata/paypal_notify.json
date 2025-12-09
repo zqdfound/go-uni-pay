@@ -1,0 +1,95 @@
+{
+  "id": "WH-1AB23456CD789012E-3FG45678HI901234J",
+  "event_version": "1.0",
+  "create_time": "2024-01-01T10:05:30Z",
+  "resource_type": "capture",
+  "resource_version": "2.0",
+  "event_type": "PAYMENT.CAPTURE.COMPLETED",
+  "summary": "Payment completed for EUR 100.00 EUR",
+  "resource": {
+    "id": "2AB34567CD890123E",
+    "amount": {
+      "currency_code": "USD",
+      "value": "100.00"
+    },
+    "final_capture": true,
+    "seller_protection": {
+      "status": "ELIGIBLE",
+      "dispute_categories": [
+        "ITEM_NOT_RECEIVED",
+        "UNAUTHORIZED_TRANSACTION"
+      ]
+    },
+    "seller_receivable_breakdown": {
+      "gross_amount": {
+        "currency_code": "USD",
+        "value": "100.00"
+      },
+      "paypal_fee": {
+        "currency_code": "USD",
+        "value": "3.20"
+      },
+      "net_amount": {
+        "currency_code": "USD",
+        "value": "96.80"
+      }
+    },
+    "custom_id": "TEST20240101000001",
+    "invoice_id": "TEST-INV-001",
+    "status": "COMPLETED",
+    "status_details": {},
+    "supplementary_data": {
+      "related_ids": {
+        "order_id": "7AB12345CD678901E"
+      }
+    },
+    "create_time": "2024-01-01T10:05:00Z",
+    "update_time": "2024-01-01T10:05:30Z",
+    "links": [
+      {
+        "href": "https://api.paypal.com/v2/payments/captures/2AB34567CD890123E",
+        "rel": "self",
+        "method": "GET"
+      },
+      {
+        "href": "https://api.paypal.com/v2/payments/captures/2AB34567CD890123E/refund",
+        "rel": "refund",
+        "method": "POST"
+      },
+      {
+        "href": "https://api.paypal.com/v2/checkout/orders/7AB12345CD678901E",
+        "rel": "up",
+        "method": "GET"
+      }
+    ],
+    "payer": {
+      "email_address": "customer@example.com",
+      "payer_id": "PAYERID123",
+      "name": {
+        "given_name": "John",
+        "surname": "Doe"
+      },
+      "phone": {
+        "phone_type": "MOBILE",
+        "phone_number": {
+          "national_number": "4085551234"
+        }
+      },
+      "address": {
+        "country_code": "US"
+      }
+    }
+  },
+  "links": [
+    {
+      "href": "https://api.paypal.com/v1/notifications/webhooks-events/WH-1AB23456CD789012E-3FG45678HI901234J",
+      "rel": "self",
+      "method": "GET"
+    },
+    {
+      "href": "https://api.paypal.com/v1/notifications/webhooks-events/WH-1AB23456CD789012E-3FG45678HI901234J/resend",
+      "rel": "resend",
+      "method": "POST"
+    }
+  ]
+}

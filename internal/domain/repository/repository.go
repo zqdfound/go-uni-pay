@@ -12,6 +12,7 @@ type UserRepository interface {
 	GetByID(ctx context.Context, id uint64) (*entity.User, error)
 	GetByAPIKey(ctx context.Context, apiKey string) (*entity.User, error)
 	Update(ctx context.Context, user *entity.User) error
+	List(ctx context.Context, page, pageSize int) ([]*entity.User, int64, error)
 }
 
 // PaymentConfigRepository 支付配置仓储接口
@@ -22,6 +23,7 @@ type PaymentConfigRepository interface {
 	GetActiveByUserAndProvider(ctx context.Context, userID uint64, provider string) (*entity.PaymentConfig, error)
 	Update(ctx context.Context, config *entity.PaymentConfig) error
 	Delete(ctx context.Context, id uint64) error
+	List(ctx context.Context, page, pageSize int, userID uint64) ([]*entity.PaymentConfig, int64, error)
 }
 
 // PaymentOrderRepository 支付订单仓储接口
@@ -38,12 +40,14 @@ type PaymentOrderRepository interface {
 type PaymentLogRepository interface {
 	Create(ctx context.Context, log *entity.PaymentLog) error
 	List(ctx context.Context, orderID uint64, page, pageSize int) ([]*entity.PaymentLog, int64, error)
+	ListAll(ctx context.Context, page, pageSize int) ([]*entity.PaymentLog, int64, error)
 }
 
 // APILogRepository API日志仓储接口
 type APILogRepository interface {
 	Create(ctx context.Context, log *entity.APILog) error
 	List(ctx context.Context, userID uint64, page, pageSize int) ([]*entity.APILog, int64, error)
+	ListAll(ctx context.Context, page, pageSize int) ([]*entity.APILog, int64, error)
 }
 
 // NotifyQueueRepository 通知队列仓储接口
@@ -52,4 +56,15 @@ type NotifyQueueRepository interface {
 	GetByID(ctx context.Context, id uint64) (*entity.NotifyQueue, error)
 	GetPendingTasks(ctx context.Context, limit int) ([]*entity.NotifyQueue, error)
 	Update(ctx context.Context, queue *entity.NotifyQueue) error
+	List(ctx context.Context, page, pageSize int) ([]*entity.NotifyQueue, int64, error)
+}
+
+// AdminRepository 管理员仓储接口
+type AdminRepository interface {
+	Create(ctx context.Context, admin *entity.Admin) error
+	GetByID(ctx context.Context, id uint64) (*entity.Admin, error)
+	GetByUsername(ctx context.Context, username string) (*entity.Admin, error)
+	Update(ctx context.Context, admin *entity.Admin) error
+	List(ctx context.Context, page, pageSize int) ([]*entity.Admin, int64, error)
+	Delete(ctx context.Context, id uint64) error
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/zqdfound/go-uni-pay/internal/api/handler"
 	"github.com/zqdfound/go-uni-pay/internal/api/middleware"
 	"github.com/zqdfound/go-uni-pay/internal/domain/repository"
+	"github.com/zqdfound/go-uni-pay/internal/service/admin"
 	"github.com/zqdfound/go-uni-pay/internal/service/auth"
 )
 
@@ -14,6 +15,9 @@ import (
 func SetupRouter(
 	authService *auth.Service,
 	paymentHandler *handler.PaymentHandler,
+	adminHandler *handler.AdminHandler,
+	managementHandler *handler.ManagementHandler,
+	adminService *admin.Service,
 	apiLogRepo repository.APILogRepository,
 ) *gin.Engine {
 	r := gin.New()
@@ -43,16 +47,57 @@ func SetupRouter(
 		}
 
 		// 需要认证的接口
-		auth := v1.Group("")
-		auth.Use(middleware.AuthMiddleware(authService))
+		authenticated := v1.Group("")
+		authenticated.Use(middleware.AuthMiddleware(authService))
 		// 添加限流：每分钟最多100次请求
-		auth.Use(middleware.RateLimitMiddleware(100, time.Minute))
+		authenticated.Use(middleware.RateLimitMiddleware(100, time.Minute))
 		{
 			// 支付相关接口
-			payment := auth.Group("/payment")
+			payment := authenticated.Group("/payment")
 			{
 				payment.POST("/create", paymentHandler.CreatePayment)
 				payment.GET("/query/:order_no", paymentHandler.QueryPayment)
+			}
+		}
+
+		// 管理后台接口
+		admin := v1.Group("/admin")
+		{
+			// 管理员登录（无需认证）
+			admin.POST("/login", adminHandler.Login)
+
+			// 需要管理员认证的接口
+			adminAuth := admin.Group("")
+			adminAuth.Use(middleware.AdminAuthMiddleware(adminService))
+			{
+				// 管理员管理
+				adminAuth.GET("/admins", adminHandler.ListAdmins)
+				adminAuth.GET("/admins/:id", adminHandler.GetAdmin)
+				adminAuth.POST("/admins", adminHandler.CreateAdmin)
+				adminAuth.PUT("/admins", adminHandler.UpdateAdmin)
+				adminAuth.DELETE("/admins/:id", adminHandler.DeleteAdmin)
+				adminAuth.GET("/current", adminHandler.GetCurrentAdmin)
+
+				// 用户管理
+				adminAuth.GET("/users", managementHandler.ListUsers)
+				adminAuth.GET("/users/:id", managementHandler.GetUser)
+
+				// 支付配置管理
+				adminAuth.GET("/configs", managementHandler.ListPaymentConfigs)
+				adminAuth.GET("/configs/:id", managementHandler.GetPaymentConfig)
+
+				// 订单管理
+				adminAuth.GET("/orders", managementHandler.ListOrders)
+				adminAuth.GET("/orders/:id", managementHandler.GetOrder)
+
+				// 支付日志
+				adminAuth.GET("/payment-logs", managementHandler.ListPaymentLogs)
+
+				// API调用日志
+				adminAuth.GET("/api-logs", managementHandler.ListAPILogs)
+
+				// 通知队列
+				adminAuth.GET("/notify-queue", managementHandler.ListNotifyQueue)
 			}
 		}
 	}

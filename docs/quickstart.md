@@ -1,5 +1,96 @@
 # 快速开始指南
 
+## 🚀 管理后台快速体验
+
+### 默认管理员账号
+
+系统已经预设了一个默认管理员账号，可以直接使用：
+
+**登录信息：**
+- 🔑 用户名：`admin`
+- 🔒 密码：`admin123`
+- 📧 邮箱：`admin@example.com`
+
+**访问地址：**
+- 后端API：http://localhost:8080
+- 前端管理后台：http://localhost:3000
+
+### 初始化管理员账号
+
+如果数据库中还没有管理员账号，执行以下SQL：
+
+```sql
+-- 创建管理员表（如果还没有创建）
+CREATE TABLE IF NOT EXISTS `admins` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '管理员ID',
+  `username` varchar(50) NOT NULL COMMENT '用户名',
+  `password` varchar(128) NOT NULL COMMENT '密码（加密）',
+  `nickname` varchar(50) DEFAULT NULL COMMENT '昵称',
+  `email` varchar(100) DEFAULT NULL COMMENT '邮箱',
+  `status` tinyint NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-启用',
+  `last_login` datetime DEFAULT NULL COMMENT '最后登录时间',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_username` (`username`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='管理员表';
+
+-- 插入默认管理员（用户名：admin，密码：admin123）
+INSERT INTO `admins` (`username`, `password`, `nickname`, `email`, `status`)
+VALUES ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z2ELoYkSWLbk1cN5lZfRUBEu', '超级管理员', 'admin@example.com', 1);
+```
+
+### 生成自定义密码
+
+如果需要创建其他管理员或修改密码，使用密码生成工具：
+
+```bash
+cd /Users/zqd/Desktop/zqd/my/go-uni-pay
+
+# 生成密码hash
+go run tools/gen_password.go your_password_here
+
+# 示例：生成密码为 "mypassword" 的hash
+go run tools/gen_password.go mypassword
+```
+
+输出示例：
+```
+========================================
+密码生成成功!
+========================================
+
+原始密码: mypassword
+加密密码: $2a$10$xxx...
+
+SQL插入语句:
+----------------------------------------
+INSERT INTO `admins` (`username`, `password`, `nickname`, `email`, `status`)
+VALUES ('your_username', '$2a$10$xxx...', '管理员', 'admin@example.com', 1);
+----------------------------------------
+```
+
+### 启动管理后台
+
+**1. 启动后端服务：**
+```bash
+cd /Users/zqd/Desktop/zqd/my/go-uni-pay
+go run cmd/server/main.go
+```
+
+**2. 启动前端服务：**
+```bash
+cd /Users/zqd/Desktop/zqd/my/admin-frontend
+npm install
+npm run dev
+```
+
+**3. 访问管理后台：**
+
+打开浏览器访问 http://localhost:3000，使用默认账号登录即可。
+
+---
+
 ## 5分钟快速体验
 
 ### 1. 环境准备

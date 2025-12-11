@@ -56,6 +56,24 @@ func (r *MySQLUserRepository) Update(ctx context.Context, user *entity.User) err
 	return nil
 }
 
+func (r *MySQLUserRepository) List(ctx context.Context, page, pageSize int) ([]*entity.User, int64, error) {
+	var users []*entity.User
+	var total int64
+
+	db := r.db.WithContext(ctx).Model(&entity.User{})
+
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, apperrors.Wrap(apperrors.ErrDatabaseQuery, "failed to count users", err)
+	}
+
+	offset := (page - 1) * pageSize
+	if err := db.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&users).Error; err != nil {
+		return nil, 0, apperrors.Wrap(apperrors.ErrDatabaseQuery, "failed to list users", err)
+	}
+
+	return users, total, nil
+}
+
 // MySQLPaymentConfigRepository MySQL支付配置仓储实现
 type MySQLPaymentConfigRepository struct {
 	db *gorm.DB
@@ -115,6 +133,27 @@ func (r *MySQLPaymentConfigRepository) Delete(ctx context.Context, id uint64) er
 		return apperrors.Wrap(apperrors.ErrDatabaseDelete, "failed to delete config", err)
 	}
 	return nil
+}
+
+func (r *MySQLPaymentConfigRepository) List(ctx context.Context, page, pageSize int, userID uint64) ([]*entity.PaymentConfig, int64, error) {
+	var configs []*entity.PaymentConfig
+	var total int64
+
+	db := r.db.WithContext(ctx).Model(&entity.PaymentConfig{})
+	if userID > 0 {
+		db = db.Where("user_id = ?", userID)
+	}
+
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, apperrors.Wrap(apperrors.ErrDatabaseQuery, "failed to count configs", err)
+	}
+
+	offset := (page - 1) * pageSize
+	if err := db.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&configs).Error; err != nil {
+		return nil, 0, apperrors.Wrap(apperrors.ErrDatabaseQuery, "failed to list configs", err)
+	}
+
+	return configs, total, nil
 }
 
 // MySQLPaymentOrderRepository MySQL支付订单仓储实现
@@ -230,6 +269,24 @@ func (r *MySQLPaymentLogRepository) List(ctx context.Context, orderID uint64, pa
 	return logs, total, nil
 }
 
+func (r *MySQLPaymentLogRepository) ListAll(ctx context.Context, page, pageSize int) ([]*entity.PaymentLog, int64, error) {
+	var logs []*entity.PaymentLog
+	var total int64
+
+	db := r.db.WithContext(ctx).Model(&entity.PaymentLog{})
+
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, apperrors.Wrap(apperrors.ErrDatabaseQuery, "failed to count logs", err)
+	}
+
+	offset := (page - 1) * pageSize
+	if err := db.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&logs).Error; err != nil {
+		return nil, 0, apperrors.Wrap(apperrors.ErrDatabaseQuery, "failed to list logs", err)
+	}
+
+	return logs, total, nil
+}
+
 // MySQLAPILogRepository MySQL API日志仓储实现
 type MySQLAPILogRepository struct {
 	db *gorm.DB
@@ -252,6 +309,24 @@ func (r *MySQLAPILogRepository) List(ctx context.Context, userID uint64, page, p
 	var total int64
 
 	db := r.db.WithContext(ctx).Model(&entity.APILog{}).Where("user_id = ?", userID)
+
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, apperrors.Wrap(apperrors.ErrDatabaseQuery, "failed to count api logs", err)
+	}
+
+	offset := (page - 1) * pageSize
+	if err := db.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&logs).Error; err != nil {
+		return nil, 0, apperrors.Wrap(apperrors.ErrDatabaseQuery, "failed to list api logs", err)
+	}
+
+	return logs, total, nil
+}
+
+func (r *MySQLAPILogRepository) ListAll(ctx context.Context, page, pageSize int) ([]*entity.APILog, int64, error) {
+	var logs []*entity.APILog
+	var total int64
+
+	db := r.db.WithContext(ctx).Model(&entity.APILog{})
 
 	if err := db.Count(&total).Error; err != nil {
 		return nil, 0, apperrors.Wrap(apperrors.ErrDatabaseQuery, "failed to count api logs", err)
@@ -321,6 +396,95 @@ func (r *MySQLNotifyQueueRepository) Update(ctx context.Context, queue *entity.N
 		"success_time":    queue.SuccessTime,
 	}).Error; err != nil {
 		return apperrors.Wrap(apperrors.ErrDatabaseUpdate, "failed to update notify queue", err)
+	}
+	return nil
+}
+
+func (r *MySQLNotifyQueueRepository) List(ctx context.Context, page, pageSize int) ([]*entity.NotifyQueue, int64, error) {
+	var queues []*entity.NotifyQueue
+	var total int64
+
+	db := r.db.WithContext(ctx).Model(&entity.NotifyQueue{})
+
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, apperrors.Wrap(apperrors.ErrDatabaseQuery, "failed to count notify queues", err)
+	}
+
+	offset := (page - 1) * pageSize
+	if err := db.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&queues).Error; err != nil {
+		return nil, 0, apperrors.Wrap(apperrors.ErrDatabaseQuery, "failed to list notify queues", err)
+	}
+
+	return queues, total, nil
+}
+
+// MySQLAdminRepository MySQL管理员仓储实现
+type MySQLAdminRepository struct {
+	db *gorm.DB
+}
+
+// NewMySQLAdminRepository 创建MySQL管理员仓储
+func NewMySQLAdminRepository(db *gorm.DB) *MySQLAdminRepository {
+	return &MySQLAdminRepository{db: db}
+}
+
+func (r *MySQLAdminRepository) Create(ctx context.Context, admin *entity.Admin) error {
+	if err := r.db.WithContext(ctx).Create(admin).Error; err != nil {
+		return apperrors.Wrap(apperrors.ErrDatabaseInsert, "failed to create admin", err)
+	}
+	return nil
+}
+
+func (r *MySQLAdminRepository) GetByID(ctx context.Context, id uint64) (*entity.Admin, error) {
+	var admin entity.Admin
+	if err := r.db.WithContext(ctx).First(&admin, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, apperrors.New(apperrors.ErrNotFound, "admin not found")
+		}
+		return nil, apperrors.Wrap(apperrors.ErrDatabaseQuery, "failed to get admin", err)
+	}
+	return &admin, nil
+}
+
+func (r *MySQLAdminRepository) GetByUsername(ctx context.Context, username string) (*entity.Admin, error) {
+	var admin entity.Admin
+	if err := r.db.WithContext(ctx).Where("username = ?", username).First(&admin).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, apperrors.New(apperrors.ErrNotFound, "admin not found")
+		}
+		return nil, apperrors.Wrap(apperrors.ErrDatabaseQuery, "failed to get admin", err)
+	}
+	return &admin, nil
+}
+
+func (r *MySQLAdminRepository) Update(ctx context.Context, admin *entity.Admin) error {
+	if err := r.db.WithContext(ctx).Save(admin).Error; err != nil {
+		return apperrors.Wrap(apperrors.ErrDatabaseUpdate, "failed to update admin", err)
+	}
+	return nil
+}
+
+func (r *MySQLAdminRepository) List(ctx context.Context, page, pageSize int) ([]*entity.Admin, int64, error) {
+	var admins []*entity.Admin
+	var total int64
+
+	db := r.db.WithContext(ctx).Model(&entity.Admin{})
+
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, apperrors.Wrap(apperrors.ErrDatabaseQuery, "failed to count admins", err)
+	}
+
+	offset := (page - 1) * pageSize
+	if err := db.Order("created_at DESC").Offset(offset).Limit(pageSize).Find(&admins).Error; err != nil {
+		return nil, 0, apperrors.Wrap(apperrors.ErrDatabaseQuery, "failed to list admins", err)
+	}
+
+	return admins, total, nil
+}
+
+func (r *MySQLAdminRepository) Delete(ctx context.Context, id uint64) error {
+	if err := r.db.WithContext(ctx).Delete(&entity.Admin{}, id).Error; err != nil {
+		return apperrors.Wrap(apperrors.ErrDatabaseDelete, "failed to delete admin", err)
 	}
 	return nil
 }

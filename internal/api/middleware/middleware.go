@@ -5,12 +5,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/zqdfound/go-uni-pay/internal/domain/entity"
 	"github.com/zqdfound/go-uni-pay/internal/domain/repository"
 	"github.com/zqdfound/go-uni-pay/internal/infrastructure/cache"
+	"github.com/zqdfound/go-uni-pay/internal/service/admin"
 	"github.com/zqdfound/go-uni-pay/internal/service/auth"
 	apperrors "github.com/zqdfound/go-uni-pay/pkg/errors"
 	"github.com/zqdfound/go-uni-pay/pkg/logger"
@@ -231,4 +233,50 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// AdminAuthMiddleware 管理员认证中间件
+func AdminAuthMiddleware(adminService *admin.Service) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 从Authorization header获取token
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(401, gin.H{
+				"code":    apperrors.ErrUnauthorized,
+				"message": "missing authorization token",
+			})
+			c.Abort()
+			return
+		}
+
+		// 解析Bearer token
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			c.JSON(401, gin.H{
+				"code":    apperrors.ErrUnauthorized,
+				"message": "invalid authorization format",
+			})
+			c.Abort()
+			return
+		}
+
+		token := parts[1]
+
+		// 验证token
+		adminID, username, err := adminService.VerifyToken(token)
+		if err != nil {
+			c.JSON(401, gin.H{
+				"code":    apperrors.ErrUnauthorized,
+				"message": "invalid or expired token",
+			})
+			c.Abort()
+			return
+		}
+
+		// 将管理员信息存入上下文
+		c.Set("admin_id", adminID)
+		c.Set("admin_username", username)
+
+		c.Next()
+	}
 }

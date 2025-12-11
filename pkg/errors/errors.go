@@ -9,14 +9,16 @@ type ErrorCode int
 
 const (
 	// 通用错误码 1000-1999
-	ErrSuccess          ErrorCode = 0
-	ErrInternalServer   ErrorCode = 1000
-	ErrInvalidParam     ErrorCode = 1001
-	ErrUnauthorized     ErrorCode = 1002
-	ErrForbidden        ErrorCode = 1003
-	ErrNotFound         ErrorCode = 1004
-	ErrConflict         ErrorCode = 1005
-	ErrTooManyRequests  ErrorCode = 1006
+	ErrSuccess            ErrorCode = 0
+	ErrInternalServer     ErrorCode = 1000
+	ErrInvalidParam       ErrorCode = 1001
+	ErrUnauthorized       ErrorCode = 1002
+	ErrForbidden          ErrorCode = 1003
+	ErrNotFound           ErrorCode = 1004
+	ErrConflict           ErrorCode = 1005
+	ErrTooManyRequests    ErrorCode = 1006
+	ErrInvalidCredentials ErrorCode = 1007
+	ErrInvalidToken       ErrorCode = 1008
 
 	// 支付相关错误码 2000-2999
 	ErrPaymentCreate    ErrorCode = 2000
@@ -31,16 +33,16 @@ const (
 	ErrAmountInvalid    ErrorCode = 2009
 
 	// 数据库错误码 3000-3999
-	ErrDatabaseQuery    ErrorCode = 3000
-	ErrDatabaseInsert   ErrorCode = 3001
-	ErrDatabaseUpdate   ErrorCode = 3002
-	ErrDatabaseDelete   ErrorCode = 3003
+	ErrDatabaseQuery  ErrorCode = 3000
+	ErrDatabaseInsert ErrorCode = 3001
+	ErrDatabaseUpdate ErrorCode = 3002
+	ErrDatabaseDelete ErrorCode = 3003
 
 	// Redis错误码 4000-4999
-	ErrRedisGet         ErrorCode = 4000
-	ErrRedisSet         ErrorCode = 4001
-	ErrRedisDel         ErrorCode = 4002
-	ErrRedisLock        ErrorCode = 4003
+	ErrRedisGet  ErrorCode = 4000
+	ErrRedisSet  ErrorCode = 4001
+	ErrRedisDel  ErrorCode = 4002
+	ErrRedisLock ErrorCode = 4003
 )
 
 // AppError 应用错误
@@ -82,32 +84,34 @@ func Wrap(code ErrorCode, message string, err error) *AppError {
 
 // 错误消息映射
 var errorMessages = map[ErrorCode]string{
-	ErrSuccess:          "Success",
-	ErrInternalServer:   "Internal server error",
-	ErrInvalidParam:     "Invalid parameter",
-	ErrUnauthorized:     "Unauthorized",
-	ErrForbidden:        "Forbidden",
-	ErrNotFound:         "Not found",
-	ErrConflict:         "Conflict",
-	ErrTooManyRequests:  "Too many requests",
-	ErrPaymentCreate:    "Failed to create payment",
-	ErrPaymentQuery:     "Failed to query payment",
-	ErrPaymentNotify:    "Failed to process payment notification",
-	ErrPaymentRefund:    "Failed to refund payment",
-	ErrPaymentCancel:    "Failed to cancel payment",
-	ErrProviderNotFound: "Payment provider not found",
-	ErrConfigNotFound:   "Payment config not found",
-	ErrOrderNotFound:    "Order not found",
-	ErrOrderStatus:      "Invalid order status",
-	ErrAmountInvalid:    "Invalid amount",
-	ErrDatabaseQuery:    "Database query error",
-	ErrDatabaseInsert:   "Database insert error",
-	ErrDatabaseUpdate:   "Database update error",
-	ErrDatabaseDelete:   "Database delete error",
-	ErrRedisGet:         "Redis get error",
-	ErrRedisSet:         "Redis set error",
-	ErrRedisDel:         "Redis delete error",
-	ErrRedisLock:        "Redis lock error",
+	ErrSuccess:            "Success",
+	ErrInternalServer:     "Internal server error",
+	ErrInvalidParam:       "Invalid parameter",
+	ErrUnauthorized:       "Unauthorized",
+	ErrForbidden:          "Forbidden",
+	ErrNotFound:           "Not found",
+	ErrConflict:           "Conflict",
+	ErrTooManyRequests:    "Too many requests",
+	ErrInvalidCredentials: "Invalid credentials",
+	ErrInvalidToken:       "Invalid token",
+	ErrPaymentCreate:      "Failed to create payment",
+	ErrPaymentQuery:       "Failed to query payment",
+	ErrPaymentNotify:      "Failed to process payment notification",
+	ErrPaymentRefund:      "Failed to refund payment",
+	ErrPaymentCancel:      "Failed to cancel payment",
+	ErrProviderNotFound:   "Payment provider not found",
+	ErrConfigNotFound:     "Payment config not found",
+	ErrOrderNotFound:      "Order not found",
+	ErrOrderStatus:        "Invalid order status",
+	ErrAmountInvalid:      "Invalid amount",
+	ErrDatabaseQuery:      "Database query error",
+	ErrDatabaseInsert:     "Database insert error",
+	ErrDatabaseUpdate:     "Database update error",
+	ErrDatabaseDelete:     "Database delete error",
+	ErrRedisGet:           "Redis get error",
+	ErrRedisSet:           "Redis set error",
+	ErrRedisDel:           "Redis delete error",
+	ErrRedisLock:          "Redis lock error",
 }
 
 // GetMessage 获取错误消息

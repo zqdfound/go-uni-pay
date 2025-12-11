@@ -16,6 +16,7 @@ import (
 	"github.com/zqdfound/go-uni-pay/internal/infrastructure/cache"
 	"github.com/zqdfound/go-uni-pay/internal/infrastructure/config"
 	"github.com/zqdfound/go-uni-pay/internal/infrastructure/database"
+	"github.com/zqdfound/go-uni-pay/internal/service/admin"
 	"github.com/zqdfound/go-uni-pay/internal/service/auth"
 	"github.com/zqdfound/go-uni-pay/internal/service/notify"
 	"github.com/zqdfound/go-uni-pay/internal/service/payment"
@@ -91,9 +92,11 @@ func main() {
 	paymentLogRepo := repository.NewMySQLPaymentLogRepository(db)
 	apiLogRepo := repository.NewMySQLAPILogRepository(db)
 	notifyQueueRepo := repository.NewMySQLNotifyQueueRepository(db)
+	adminRepo := repository.NewMySQLAdminRepository(db)
 
 	// 创建服务
 	authService := auth.NewService(userRepo)
+	adminService := admin.NewService(adminRepo, config.Cfg)
 
 	// 先创建通知服务
 	notifyService := notify.NewService(
@@ -112,12 +115,21 @@ func main() {
 
 	// 创建处理器
 	paymentHandler := handler.NewPaymentHandler(paymentService)
+	adminHandler := handler.NewAdminHandler(adminService)
+	managementHandler := handler.NewManagementHandler(
+		userRepo,
+		paymentConfigRepo,
+		paymentOrderRepo,
+		paymentLogRepo,
+		apiLogRepo,
+		notifyQueueRepo,
+	)
 
 	// 设置Gin模式
 	gin.SetMode(config.Cfg.Server.Mode)
 
 	// 创建路由
-	r := router.SetupRouter(authService, paymentHandler, apiLogRepo)
+	r := router.SetupRouter(authService, paymentHandler, adminHandler, managementHandler, adminService, apiLogRepo)
 
 	// 创建HTTP服务器
 	srv := &http.Server{

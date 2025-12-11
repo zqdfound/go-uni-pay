@@ -171,3 +171,21 @@ const (
 	NotifyStatusSuccess    = "success"
 	NotifyStatusFailed     = "failed"
 )
+
+// Admin 管理员实体
+type Admin struct {
+	ID        uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	Username  string     `gorm:"type:varchar(50);uniqueIndex;not null" json:"username"`
+	Password  string     `gorm:"type:varchar(128);not null" json:"-"`
+	Nickname  string     `gorm:"type:varchar(50)" json:"nickname"`
+	Email     string     `gorm:"type:varchar(100)" json:"email"`
+	Status    int8       `gorm:"type:tinyint;not null;default:1" json:"status"`
+	LastLogin *time.Time `json:"last_login"`
+	CreatedAt time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+// TableName 表名
+func (Admin) TableName() string {
+	return "admins"
+}

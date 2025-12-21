@@ -131,12 +131,21 @@ func (p *Provider) HandleNotify(ctx context.Context, req *payment.NotifyRequest)
 	case "PAYMENT.CAPTURE.COMPLETED":
 		// 支付成功
 		response.Status = payment.StatusSuccess
-		response.TradeNo = getStringValue(resource, "id")
 
-		// 获取订单信息
+		// 获取订单ID
+		var orderID string
 		if supplementaryData, ok := resource["supplementary_data"].(map[string]interface{}); ok {
 			if relatedIDs, ok := supplementaryData["related_ids"].(map[string]interface{}); ok {
-				response.OutTradeNo = getStringValue(relatedIDs, "order_id")
+				orderID = getStringValue(relatedIDs, "order_id")
+				response.TradeNo = orderID
+			}
+		}
+
+		// 查询订单以获取商户订单号
+		if orderID != "" {
+			order, err := client.GetOrder(ctx, orderID)
+			if err == nil && len(order.PurchaseUnits) > 0 {
+				response.OutTradeNo = order.PurchaseUnits[0].ReferenceID
 			}
 		}
 

@@ -68,10 +68,10 @@ func (c *ConfigData) Scan(value interface{}) error {
 type PaymentOrder struct {
 	ID          uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
 	OrderNo     string     `gorm:"type:varchar(64);uniqueIndex;not null" json:"order_no"`
-	UserID      uint64     `gorm:"not null;index" json:"user_id"`
+	UserID      uint64     `gorm:"not null;uniqueIndex:idx_user_out_trade;index" json:"user_id"`
 	Provider    string     `gorm:"type:varchar(20);not null;index" json:"provider"`
 	ConfigID    uint64     `gorm:"not null" json:"config_id"`
-	OutTradeNo  string     `gorm:"type:varchar(64);not null;index" json:"out_trade_no"`
+	OutTradeNo  string     `gorm:"type:varchar(64);not null;uniqueIndex:idx_user_out_trade;index" json:"out_trade_no"`
 	TradeNo     string     `gorm:"type:varchar(64);index" json:"trade_no"`
 	Subject     string     `gorm:"type:varchar(256);not null" json:"subject"`
 	Body        string     `gorm:"type:text" json:"body"`

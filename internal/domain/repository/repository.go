@@ -32,6 +32,7 @@ type PaymentOrderRepository interface {
 	GetByID(ctx context.Context, id uint64) (*entity.PaymentOrder, error)
 	GetByOrderNo(ctx context.Context, orderNo string) (*entity.PaymentOrder, error)
 	GetByOutTradeNo(ctx context.Context, outTradeNo string) (*entity.PaymentOrder, error)
+	GetByUserAndOutTradeNo(ctx context.Context, userID uint64, outTradeNo string) (*entity.PaymentOrder, error)
 	Update(ctx context.Context, order *entity.PaymentOrder) error
 	List(ctx context.Context, userID uint64, page, pageSize int) ([]*entity.PaymentOrder, int64, error)
 }

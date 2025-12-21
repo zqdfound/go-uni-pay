@@ -206,6 +206,17 @@ func (r *MySQLPaymentOrderRepository) GetByOutTradeNo(ctx context.Context, outTr
 	return &order, nil
 }
 
+func (r *MySQLPaymentOrderRepository) GetByUserAndOutTradeNo(ctx context.Context, userID uint64, outTradeNo string) (*entity.PaymentOrder, error) {
+	var order entity.PaymentOrder
+	if err := r.db.WithContext(ctx).Where("user_id = ? AND out_trade_no = ?", userID, outTradeNo).First(&order).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, apperrors.New(apperrors.ErrOrderNotFound, "order not found")
+		}
+		return nil, apperrors.Wrap(apperrors.ErrDatabaseQuery, "failed to get order", err)
+	}
+	return &order, nil
+}
+
 func (r *MySQLPaymentOrderRepository) Update(ctx context.Context, order *entity.PaymentOrder) error {
 	if err := r.db.WithContext(ctx).Save(order).Error; err != nil {
 		return apperrors.Wrap(apperrors.ErrDatabaseUpdate, "failed to update order", err)

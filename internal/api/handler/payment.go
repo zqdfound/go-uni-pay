@@ -13,7 +13,7 @@ import (
 // PaymentServiceInterface 支付服务接口，用于依赖注入和测试
 type PaymentServiceInterface interface {
 	CreatePayment(ctx context.Context, req *paymentService.CreatePaymentRequest) (*paymentService.CreatePaymentResponse, error)
-	QueryPayment(ctx context.Context, orderNo string) (interface{}, error)
+	QueryPayment(ctx context.Context, userID uint64, orderNo string) (interface{}, error)
 	HandleNotify(ctx context.Context, provider string, req *payment.NotifyRequest) ([]byte, error)
 	GetConfigByID(ctx context.Context, configID uint64) (map[string]interface{}, error)
 }
@@ -111,7 +111,17 @@ func (h *PaymentHandler) QueryPayment(c *gin.Context) {
 		return
 	}
 
-	order, err := h.paymentService.QueryPayment(c.Request.Context(), orderNo)
+	// 获取用户ID（数据隔离）
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(401, gin.H{
+			"code":    apperrors.ErrUnauthorized,
+			"message": "unauthorized",
+		})
+		return
+	}
+
+	order, err := h.paymentService.QueryPayment(c.Request.Context(), userID.(uint64), orderNo)
 	if err != nil {
 		if appErr, ok := err.(*apperrors.AppError); ok {
 			c.JSON(400, gin.H{

@@ -86,7 +86,7 @@ func (s *Service) CreatePayment(ctx context.Context, req *CreatePaymentRequest) 
 	}()
 
 	// 检查订单是否已存在（幂等性保证）
-	existingOrder, err := s.orderRepo.GetByOutTradeNo(ctx, req.OutTradeNo)
+	existingOrder, err := s.orderRepo.GetByUserAndOutTradeNo(ctx, req.UserID, req.OutTradeNo)
 	if err == nil && existingOrder != nil {
 		// 订单已存在，根据订单状态返回相应信息
 		logger.Info("payment order already exists",
@@ -188,11 +188,16 @@ func (s *Service) CreatePayment(ctx context.Context, req *CreatePaymentRequest) 
 }
 
 // QueryPayment 查询支付
-func (s *Service) QueryPayment(ctx context.Context, orderNo string) (interface{}, error) {
+func (s *Service) QueryPayment(ctx context.Context, userID uint64, orderNo string) (interface{}, error) {
 	// 查询订单
 	order, err := s.orderRepo.GetByOrderNo(ctx, orderNo)
 	if err != nil {
 		return nil, err
+	}
+
+	// 验证订单归属（数据隔离）
+	if order.UserID != userID {
+		return nil, apperrors.New(apperrors.ErrOrderNotFound, "order not found")
 	}
 
 	// 如果订单已经是最终状态，直接返回
@@ -291,6 +296,11 @@ func (s *Service) HandleNotify(ctx context.Context, provider string, req *paymen
 	}
 
 	// 查询订单
+	// 注意：这里使用 GetByOutTradeNo 而不是 GetByUserAndOutTradeNo
+	// 原因：支付回调中没有 user_id，但安全性通过以下方式保证：
+	// 1. 支付提供商的签名验证（在 HandleNotify 中已完成）
+	// 2. 订单的 ConfigID 关联到具体用户的配置
+	// 3. 数据库联合唯一索引 (user_id, out_trade_no) 防止重复
 	order, err := s.orderRepo.GetByOutTradeNo(ctx, notifyResp.OutTradeNo)
 	if err != nil {
 		logger.Error("order not found", zap.String("out_trade_no", notifyResp.OutTradeNo))

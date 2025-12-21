@@ -32,8 +32,8 @@ func (m *MockPaymentService) CreatePayment(ctx context.Context, req *paymentServ
 	return args.Get(0).(*paymentService.CreatePaymentResponse), args.Error(1)
 }
 
-func (m *MockPaymentService) QueryPayment(ctx context.Context, orderNo string) (interface{}, error) {
-	args := m.Called(ctx, orderNo)
+func (m *MockPaymentService) QueryPayment(ctx context.Context, userID uint64, orderNo string) (interface{}, error) {
+	args := m.Called(ctx, userID, orderNo)
 	return args.Get(0), args.Error(1)
 }
 
